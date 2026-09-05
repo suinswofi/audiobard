@@ -1,0 +1,134 @@
+'use strict';
+const { app, BrowserWindow, ipcMain, dialog, shell, utilityProcess } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const { EXTENSIONS } = require('./lib/book');
+const { findFfmpeg } = require('./lib/ffmpeg');
+const { findSystemPython, isInstalled, install } = require('./lib/clone');
+const { floatToPcm16, writeWav } = require('./lib/wav');
+const { VOICES } = require('./lib/voices');
+
+const userData = app.getPath('userData');
+const dirs = {
+  models: path.join(userData, 'models'),
+  venv: path.join(userData, 'venv'),
+  samples: path.join(userData, 'samples'),
+};
+const cloneScript = path.join(__dirname, 'python', 'narrata_tts.py');
+
+let win = null;
+let worker = null;
+let nextId = 1;
+const pending = new Map();
+
+function startWorker() {
+  worker = utilityProcess.fork(path.join(__dirname, 'worker.js'), [], { serviceName: 'narrata-worker', stdio: 'inherit' });
+  worker.on('message', (msg) => {
+    if (msg.id && pending.has(msg.id)) {
+      const p = pending.get(msg.id);
+      pending.delete(msg.id);
+      msg.error ? p.reject(new Error(msg.error)) : p.resolve(msg.result);
+    } else if (win && !win.isDestroyed()) {
+      win.webContents.send('worker-event', msg);
+    }
+  });
+  worker.on('exit', (code) => {
+    for (const p of pending.values()) p.reject(new Error('The conversion engine stopped unexpectedly.'));
+    pending.clear();
+    if (win && !win.isDestroyed()) win.webContents.send('worker-event', { type: 'error', message: `The conversion engine stopped unexpectedly (code ${code}).` });
+    if (!app.isQuitting) startWorker();
+  });
+}
+
+function call(op, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, { resolve, reject });
+    worker.postMessage({ id, op, ...payload });
+  });
+}
+
+function defaultOutDir() {
+  for (const key of ['music', 'documents', 'home']) {
+    try { return path.join(app.getPath(key), 'Audiobooks'); } catch { /* try next */ }
+  }
+  return path.join(app.getPath('home'), 'Audiobooks');
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 760,
+    height: 860,
+    minWidth: 600,
+    minHeight: 600,
+    title: 'Narrata',
+    autoHideMenuBar: true,
+    backgroundColor: '#f6f4ef',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
+  });
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+}
+
+ipcMain.handle('env', () => ({
+  voices: VOICES,
+  ffmpeg: !!findFfmpeg(),
+  python: findSystemPython(),
+  cloneReady: isInstalled(dirs.venv),
+  defaultOutDir: defaultOutDir(),
+  platform: process.platform,
+}));
+
+ipcMain.handle('pick-book', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Ebooks', extensions: EXTENSIONS }] });
+  if (r.canceled || !r.filePaths.length) return null;
+  const file = r.filePaths[0];
+  return { file, book: await call('parse', { file }) };
+});
+
+ipcMain.handle('pick-audio', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'aac'] }] });
+  return r.canceled ? null : r.filePaths[0];
+});
+
+ipcMain.handle('pick-outdir', async (_e, current) => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'], defaultPath: current });
+  return r.canceled ? null : r.filePaths[0];
+});
+
+ipcMain.handle('save-recording', (_e, samples, rate) => {
+  fs.mkdirSync(dirs.samples, { recursive: true });
+  const file = path.join(dirs.samples, `voice-sample-${Date.now()}.wav`);
+  writeWav(file, floatToPcm16(new Float32Array(samples)), rate);
+  return file;
+});
+
+let installing = null;
+ipcMain.handle('install-clone', async () => {
+  if (!installing) {
+    installing = install(dirs.venv, { onLine: (line) => win && !win.isDestroyed() && win.webContents.send('install-log', line) })
+      .finally(() => { installing = null; });
+  }
+  await installing;
+  return true;
+});
+
+const jobEnv = () => ({ cacheDir: dirs.models, venvDir: dirs.venv, cloneScript, ffmpeg: findFfmpeg() });
+
+ipcMain.handle('preview', (_e, opts) => call('preview', { ...opts, ...jobEnv() }));
+ipcMain.handle('start', (_e, job) => {
+  fs.mkdirSync(job.outDir, { recursive: true });
+  return call('start', { ...job, ...jobEnv() });
+});
+ipcMain.handle('cancel', () => worker.postMessage({ op: 'cancel' }));
+ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
+ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));
+
+app.whenReady().then(() => {
+  for (const d of Object.values(dirs)) fs.mkdirSync(d, { recursive: true });
+  startWorker();
+  createWindow();
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+
+app.on('before-quit', () => { app.isQuitting = true; if (worker) worker.kill(); });
+app.on('window-all-closed', () => app.quit());

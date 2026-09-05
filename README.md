@@ -1,0 +1,124 @@
+# Narrata
+
+Turn any DRM-free ebook into an audiobook, entirely on your own computer.
+
+Pick an EPUB, MOBI or AZW3, choose a voice, press **Create audiobook**. Narrata reads the book aloud
+with a built-in neural voice, or in the voice of anyone who gives you a short recording.
+
+## Features
+
+- **28 built-in voices** from Kokoro-82M, American and British English, running on the CPU a few times faster than real time.
+- **Voice cloning** with Chatterbox Turbo: record ten to twenty seconds of someone speaking, or pick an audio file, and the whole book is narrated in that voice. English only.
+- **Chapter-aware output**: one WAV per chapter, or a single `.m4b` audiobook with chapter markers when `ffmpeg` is installed.
+- **Resumable**: cancel any time. Finished chapters are kept and reused on the next run.
+- **Chapter selection**: untick front matter, licence text or anything else you do not want narrated.
+- **Voice preview** before committing to a multi-hour conversion.
+- **Nothing leaves your machine.** Models are downloaded once and cached locally.
+
+## Requirements
+
+- Node.js 20 or newer (for development and for the CLI).
+- Optional: `ffmpeg` on the PATH, for `.m4b` output.
+- Optional, for voice cloning: Python 3.10+ with `venv` and `git`.
+  On Debian, Ubuntu and Mint: `sudo apt install python3-venv git`.
+
+## Run the app
+
+```sh
+npm install
+npm start
+```
+
+## Bundle a desktop app
+
+```sh
+npm run package
+```
+
+Produces `dist/Narrata-<platform>-<arch>/` with a `narrata` executable inside. The packaging script
+removes ONNX Runtime binaries for other platforms and the CUDA/TensorRT providers, which are most of
+the weight of `node_modules`.
+
+## Command line
+
+The CLI drives the same pipeline as the window.
+
+```sh
+node cli.js book.epub                                        # list chapters
+node cli.js book.epub --out ~/Audiobooks                     # narrate with Kokoro (voice af_heart)
+node cli.js book.epub --out ~/Audiobooks --voice bm_george --speed 1.1 --chapters 2-13
+node cli.js book.epub --out ~/Audiobooks --ref friend.wav    # clone a voice (after setup in the app)
+node cli.js book.epub --out ~/Audiobooks --keep-wav          # keep per-chapter WAVs next to the .m4b
+```
+
+Voice ids are the Kokoro pack names: `af_*` and `am_*` are American female and male, `bf_*` and `bm_*`
+are British. See `lib/voices.js` for the full list with Kokoro's quality grades.
+
+## Voice cloning setup
+
+In the app, choose **Clone a voice from a sample** and press **Set up voice cloning**. Narrata creates
+a private virtual environment in its data directory and installs PyTorch (CPU build unless an NVIDIA
+GPU is detected) plus `chatterbox-tts`. The first synthesis downloads the Chatterbox Turbo model from
+Hugging Face. Expect around two gigabytes in total.
+
+Cloning on a CPU is considerably slower than Kokoro, roughly real time on a modern laptop. Finished
+chapters are kept, so long books can be converted in several sittings.
+
+Tips for a good sample: ten to twenty seconds, one speaker, no music or background noise, natural
+reading pace.
+
+## How it is built
+
+Plain Electron with no bundler, framework or TypeScript. Two runtime dependencies:
+
+| Package | Purpose |
+| --- | --- |
+| `kokoro-js` | Runs Kokoro through ONNX Runtime inside Node |
+| `@huggingface/transformers` | Pulled in by kokoro-js; pinned so the model cache location can be set |
+
+Everything else is Node's standard library.
+
+```
+main.js               Electron main process: window, dialogs, IPC, worker lifecycle
+preload.js            Sandboxed bridge between the window and the main process
+worker.js             Utility process that runs parsing and synthesis off the UI thread
+renderer/             The window: one HTML file, one stylesheet, one script
+cli.js                Command-line front end to the same pipeline
+lib/zip.js            ZIP reader on node:zlib
+lib/epub.js           container.xml -> OPF -> spine, chapter titles from nav or NCX
+lib/mobi.js           PalmDB records, PalmDOC decompression, KF7 and KF8 text, EXTH metadata
+lib/html.js           HTML to narration-friendly plain text
+lib/chunk.js          Sentence-aware chunking sized for each TTS model
+lib/wav.js            Streaming WAV writer and reader
+lib/kokoro.js         Kokoro model loading with download progress
+lib/clone.js          Python environment setup and the Chatterbox sidecar client
+lib/ffmpeg.js         Optional M4B encoding with chapter metadata
+lib/pipeline.js       The conversion job: book -> chunks -> speech -> files
+python/narrata_tts.py Chatterbox Turbo behind a JSON-lines protocol on stdin/stdout
+scripts/package.js    Builds the distributable with @electron/packager
+```
+
+## Where files go
+
+| What | Location |
+| --- | --- |
+| Kokoro model | `<userData>/models` |
+| Chatterbox model | Hugging Face cache (`~/.cache/huggingface`) |
+| Python environment | `<userData>/venv` |
+| Recorded samples | `<userData>/samples` |
+| Default output | `~/Music/Audiobooks` |
+
+`<userData>` is `~/.config/narrata` on Linux, `~/Library/Application Support/narrata` on macOS and
+`%APPDATA%\narrata` on Windows. The CLI uses `~/.config/narrata` on every platform.
+
+## Limitations
+
+- DRM-protected books are refused. Remove the DRM first with a tool you are entitled to use.
+- MOBI files using the rarer HUFF/CDIC compression are not supported. Convert them to EPUB first.
+- Voice cloning is English only. Kokoro voices are English only in this build.
+- Pronunciation of unusual names and abbreviations depends on the model.
+
+## Licences
+
+Narrata's own code is ISC. Kokoro-82M is Apache 2.0. Chatterbox is MIT and applies an inaudible
+watermark to generated audio. Check each model's terms before distributing audio commercially.

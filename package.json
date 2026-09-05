@@ -1,0 +1,27 @@
+{
+  "name": "narrata",
+  "version": "0.1.0",
+  "description": "Turn any ebook into an audiobook with local TTS and voice cloning",
+  "scripts": {
+    "start": "electron .",
+    "cli": "node cli.js",
+    "package": "node scripts/package.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@huggingface/transformers": "3.8.1",
+    "kokoro-js": "1.2.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.2.0"
+  },
+  "allowScripts": {
+    "electron@44.2.0": true
+  },
+  "main": "main.js",
+  "productName": "Narrata",
+  "private": true
+}

@@ -1,0 +1,7 @@
+node_modules/
+fixtures/
+out/
+dist/
+*.wav
+*.m4b
+.cache/

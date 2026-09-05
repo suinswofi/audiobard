@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src 'self' data:; style-src 'self'">
+  <title>Narrata</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Narrata</h1>
+    <p>Turn an ebook into an audiobook. Everything runs on this computer.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2><span class="step">1</span> Book</h2>
+      <div class="row">
+        <button id="pickBook">Choose ebook…</button>
+        <span class="hint">EPUB, MOBI or AZW3 without DRM</span>
+      </div>
+      <div id="bookInfo" hidden>
+        <div class="title" id="bookTitle"></div>
+        <div class="muted" id="bookMeta"></div>
+        <div class="row small">
+          <span id="chapterSummary"></span>
+          <a href="#" id="selectAll">all</a>
+          <a href="#" id="selectNone">none</a>
+        </div>
+        <div id="chapters" class="chapters"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span> Voice</h2>
+      <label class="choice">
+        <input type="radio" name="engine" value="kokoro" checked>
+        <span>Built-in voice <span class="muted">(Kokoro, fast, runs on the CPU)</span></span>
+      </label>
+      <div id="kokoroBox" class="sub">
+        <div class="row">
+          <select id="voice"></select>
+          <label class="inline">Speed <input type="range" id="speed" min="0.7" max="1.3" step="0.05" value="1"> <span id="speedValue">1.00×</span></label>
+        </div>
+      </div>
+
+      <label class="choice">
+        <input type="radio" name="engine" value="clone">
+        <span>Clone a voice from a sample <span class="muted">(Chatterbox, English, slower)</span></span>
+      </label>
+      <div id="cloneBox" class="sub" hidden>
+        <div id="cloneSetup">
+          <p class="hint" id="cloneSetupText"></p>
+          <div class="row">
+            <button id="installClone">Set up voice cloning</button>
+            <span class="muted" id="installStatus"></span>
+          </div>
+          <pre id="installLog" hidden></pre>
+        </div>
+        <div id="cloneSample">
+          <div class="row">
+            <button id="pickRef">Choose audio file…</button>
+            <button id="record">● Record</button>
+            <button id="stopRecord" hidden>■ Stop</button>
+            <span id="recTime" class="muted"></span>
+          </div>
+          <div class="muted" id="refInfo">No sample yet. Ten to twenty seconds of clear speech works best.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="preview">▶ Preview voice</button>
+        <span class="muted" id="previewStatus"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">3</span> Audiobook</h2>
+      <div class="row">
+        <span class="muted">Save to</span>
+        <code id="outDir"></code>
+        <button id="pickOutDir" class="small">Change…</button>
+      </div>
+      <p class="hint" id="formatHint"></p>
+      <label class="inline" id="keepWavLabel" hidden><input type="checkbox" id="keepWav"> Also keep the per-chapter WAV files</label>
+      <div class="row">
+        <button id="start" class="primary">Create audiobook</button>
+        <button id="cancel" hidden>Cancel</button>
+      </div>
+      <div id="progress" hidden>
+        <div class="bar"><div id="barFill"></div></div>
+        <div class="muted" id="progressText"></div>
+      </div>
+      <div id="status" class="muted"></div>
+      <div id="result" hidden>
+        <div class="title">Done.</div>
+        <div class="row">
+          <button id="openResult">Open</button>
+          <span class="muted" id="resultText"></span>
+        </div>
+      </div>
+      <pre id="errorBox" class="error" hidden></pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

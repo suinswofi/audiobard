@@ -15,20 +15,22 @@ const FORMATS = {
 
 function fillFormats() {
   const sel = $('#format');
-  const available = state.env.ffmpeg ? ['m4b', 'mp3', 'ogg'] : ['wav'];
-  for (const id of available) {
+  for (const id of ['m4b', 'mp3', 'ogg', 'wav']) {
     const o = document.createElement('option');
     o.value = id;
     o.textContent = FORMATS[id].label;
+    if (id !== 'wav' && !state.env.ffmpeg) { o.disabled = true; o.textContent += ' (needs ffmpeg)'; }
     sel.appendChild(o);
   }
-  state.format = available[0];
+  state.format = state.env.ffmpeg ? 'm4b' : 'wav';
   sel.value = state.format;
   updateFormatUI();
 }
 
 function updateFormatUI() {
-  $('#formatHint').textContent = FORMATS[state.format].hint;
+  $('#formatHint').textContent = state.env.ffmpeg
+    ? FORMATS[state.format].hint
+    : 'ffmpeg was not found on this computer. Install it and restart Narrata to enable M4B, MP3 and OGG output.';
   $('#keepChaptersLabel').hidden = state.format !== 'm4b';
 }
 
@@ -117,6 +119,7 @@ function handleEvent(ev) {
   switch (ev.type) {
     case 'status': $('#status').textContent = ev.message; if (state.previewing) $('#previewStatus').textContent = ev.message; break;
     case 'log': console.log('[engine]', ev.message); break;
+    case 'warning': $('#status').textContent = ev.message; console.warn(ev.message); break;
     case 'progress': {
       $('#barFill').style.width = `${ev.percent.toFixed(1)}%`;
       const eta = ev.etaSeconds ? ` · about ${fmtDuration(ev.etaSeconds)} left` : '';

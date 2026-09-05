@@ -6,6 +6,7 @@ of stdout so library chatter can never corrupt the protocol channel.
 import json
 import os
 import sys
+import traceback
 
 proto = os.fdopen(os.dup(1), "w", buffering=1)
 sys.stdout = sys.stderr
@@ -57,7 +58,8 @@ def main():
                 break
             else:
                 emit({"id": rid, "ok": False, "error": "unknown op %r" % (op,)})
-        except Exception as e:  # report, keep serving
+        except Exception as e:  # report, keep serving; full traceback goes to the log
+            traceback.print_exc()
             emit({"id": rid, "ok": False, "error": "%s: %s" % (type(e).__name__, e)})
 
 

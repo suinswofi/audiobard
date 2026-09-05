@@ -50,7 +50,11 @@ node cli.js book.epub --out ~/Audiobooks --voice bm_george --speed 1.1 --chapter
 node cli.js book.epub --out ~/Audiobooks --ref friend.wav    # clone a voice (after setup in the app)
 node cli.js book.epub --out ~/Audiobooks --format ogg        # m4b (default), mp3, ogg or wav
 node cli.js book.epub --out ~/Audiobooks --keep-chapters     # keep the per-chapter files next to the .m4b
+node cli.js book.epub --out ~/Audiobooks --ref friend.wav --verbose   # show the voice engine's own log
 ```
+
+A passage the voice engine cannot read is retried once, then skipped with a warning and half a second
+of silence, so one odd line never ends a multi-hour job. Three failures in a row stop the run.
 
 Approximate sizes per hour of narration: M4B and MP3 about 30 MB, OGG (Opus) about 18 MB, WAV about 170 MB.
 

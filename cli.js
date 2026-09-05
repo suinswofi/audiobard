@@ -46,6 +46,8 @@ let cancelled = false;
 process.on('SIGINT', () => { cancelled = true; console.log('\ncancelling…'); });
 pipeline.convert(job, (ev) => {
   if (ev.type === 'status') console.log(ev.message);
+  else if (ev.type === 'warning') console.log(`\nwarning: ${ev.message}`);
+  else if (ev.type === 'log' && args.includes('--verbose')) console.error(ev.message);
   else if (ev.type === 'progress') process.stdout.write(`\r${ev.percent.toFixed(1).padStart(5)}%  ch ${ev.chapterIndex + 1}/${ev.chapterCount}  part ${Math.min(ev.chunkIndex + 1, ev.chunkCount)}/${ev.chunkCount}${ev.etaSeconds ? `  ~${(ev.etaSeconds / 60).toFixed(0)} min left` : ''}   `);
   else if (ev.type === 'done') console.log(`\ndone: ${ev.m4b || ev.dir} (${(ev.seconds / 60).toFixed(1)} min)`);
   else if (ev.type === 'cancelled') console.log('\ncancelled');

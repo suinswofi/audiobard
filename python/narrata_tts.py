@@ -20,11 +20,20 @@ def main():
     emit({"event": "status", "message": "Starting voice cloning engine (loading PyTorch)..."})
     import torch
     import torchaudio
-    from chatterbox.tts_turbo import ChatterboxTurboTTS
+    from chatterbox.tts_turbo import REPO_ID, ChatterboxTurboTTS
+    from huggingface_hub import snapshot_download
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    emit({"event": "status", "message": f"Loading Chatterbox Turbo on {device.upper()} (first run downloads the model)..."})
-    model = ChatterboxTurboTTS.from_pretrained(device=device)
+    emit({"event": "status", "message": "Downloading Chatterbox Turbo (about 3 GB on first run)..."})
+    # Chatterbox's own from_pretrained fetches every *.safetensors in the repo, including a
+    # 1 GB decoder the Turbo model never loads. Fetch only what from_local actually reads.
+    ckpt_dir = snapshot_download(
+        REPO_ID,
+        allow_patterns=["ve.safetensors", "t3_turbo_v1.safetensors", "s3gen_meanflow.safetensors",
+                        "conds.pt", "*.json", "*.txt", "*.yaml"],
+    )
+    emit({"event": "status", "message": f"Loading Chatterbox Turbo on {device.upper()}..."})
+    model = ChatterboxTurboTTS.from_local(ckpt_dir, device)
     emit({"event": "ready", "sr": model.sr, "device": device})
 
     for line in sys.stdin:

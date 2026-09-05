@@ -5,6 +5,7 @@
 //   node cli.js book.epub --out ./out          narrate with Kokoro (af_heart)
 //   node cli.js book.epub --out ./out --voice bm_george --speed 1.1 --chapters 2-5,8
 //   node cli.js book.epub --out ./out --ref sample.wav   clone the voice in sample.wav
+//   node cli.js book.epub --out ./out --format ogg       m4b (default with ffmpeg), mp3, ogg or wav
 const os = require('node:os');
 const path = require('node:path');
 const { parseBook } = require('./lib/book');
@@ -14,7 +15,7 @@ const pipeline = require('./lib/pipeline');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 const file = args.find((a) => !a.startsWith('--') && !args.includes(`--${args[args.indexOf(a) - 1]?.slice(2)}`) );
-if (!file) { console.error('usage: node cli.js <book> [--out dir] [--voice id] [--speed n] [--ref sample.wav] [--chapters 1,3-5] [--keep-wav]'); process.exit(1); }
+if (!file) { console.error('usage: node cli.js <book> [--out dir] [--format m4b|mp3|ogg|wav] [--voice id] [--speed n] [--ref sample.wav] [--chapters 1,3-5] [--keep-chapters]'); process.exit(1); }
 
 const book = parseBook(file);
 const outDir = opt('out');
@@ -36,7 +37,7 @@ const job = {
   book, outDir, chapters,
   engine: opt('ref') ? 'clone' : 'kokoro',
   voice: opt('voice', 'af_heart'), speed: Number(opt('speed', 1)), refAudio: opt('ref'),
-  keepWav: args.includes('--keep-wav'),
+  format: opt('format'), keepChapters: args.includes('--keep-chapters'),
   cacheDir: path.join(userData, 'models'), venvDir: path.join(userData, 'venv'),
   cloneScript: path.join(__dirname, 'python', 'narrata_tts.py'), ffmpeg: findFfmpeg(),
 };

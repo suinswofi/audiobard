@@ -3,8 +3,34 @@ const $ = (s) => document.querySelector(s);
 const state = {
   file: null, book: null, selected: new Set(),
   engine: 'kokoro', voice: 'af_heart', speed: 1, ref: null,
-  outDir: '', keepWav: false, env: null, running: false, previewing: false,
+  outDir: '', format: 'm4b', keepChapters: false, env: null, running: false, previewing: false,
 };
+
+const FORMATS = {
+  m4b: { label: 'M4B audiobook: one file with chapters', hint: 'Chapters are encoded to AAC as they are narrated and joined into a single .m4b. Nothing uncompressed is written.' },
+  mp3: { label: 'MP3: one file per chapter', hint: 'About 30 MB per hour. Plays anywhere.' },
+  ogg: { label: 'OGG (Opus): one file per chapter, smallest', hint: 'About 18 MB per hour. Best quality per megabyte for speech.' },
+  wav: { label: 'WAV: one file per chapter', hint: 'Uncompressed, about 170 MB per hour. Install ffmpeg to get MP3, OGG or M4B instead.' },
+};
+
+function fillFormats() {
+  const sel = $('#format');
+  const available = state.env.ffmpeg ? ['m4b', 'mp3', 'ogg'] : ['wav'];
+  for (const id of available) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = FORMATS[id].label;
+    sel.appendChild(o);
+  }
+  state.format = available[0];
+  sel.value = state.format;
+  updateFormatUI();
+}
+
+function updateFormatUI() {
+  $('#formatHint').textContent = FORMATS[state.format].hint;
+  $('#keepChaptersLabel').hidden = state.format !== 'm4b';
+}
 
 const fmtDuration = (s) => {
   const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
@@ -72,10 +98,6 @@ function refreshCloneUI() {
     ? `One-time setup: creates a private Python environment and downloads Chatterbox Turbo (about 2 GB). Found Python ${env.python.version}.`
     : 'Voice cloning needs Python 3.10 or newer installed on this computer. Install Python, then restart Narrata.';
   $('#installClone').disabled = !env.python;
-  $('#formatHint').textContent = env.ffmpeg
-    ? 'ffmpeg found: you will get a single .m4b audiobook with chapter markers.'
-    : 'You will get one WAV file per chapter. Install ffmpeg to get a single .m4b audiobook with chapters instead.';
-  $('#keepWavLabel').hidden = !env.ffmpeg;
 }
 
 function setRunning(running) {
@@ -167,6 +189,7 @@ async function init() {
   state.outDir = state.env.defaultOutDir;
   $('#outDir').textContent = state.outDir;
   fillVoices();
+  fillFormats();
   refreshCloneUI();
   narrata.onEvent(handleEvent);
   narrata.onInstallLog((line) => {
@@ -255,7 +278,8 @@ async function init() {
     const d = await narrata.pickOutDir(state.outDir);
     if (d) { state.outDir = d; $('#outDir').textContent = d; }
   };
-  $('#keepWav').onchange = (e) => { state.keepWav = e.target.checked; };
+  $('#format').onchange = (e) => { state.format = e.target.value; updateFormatUI(); };
+  $('#keepChapters').onchange = (e) => { state.keepChapters = e.target.checked; };
 
   $('#start').onclick = async () => {
     showError(null);
@@ -268,7 +292,7 @@ async function init() {
     $('#progressText').textContent = 'Starting…';
     setRunning(true);
     try {
-      await narrata.start({ file: state.file, chapters: [...state.selected].sort((a, b) => a - b), outDir: state.outDir, keepWav: state.keepWav, ...voiceOptions() });
+      await narrata.start({ file: state.file, chapters: [...state.selected].sort((a, b) => a - b), outDir: state.outDir, format: state.format, keepChapters: state.keepChapters, ...voiceOptions() });
     } catch (e) {
       setRunning(false);
       showError(e.message);

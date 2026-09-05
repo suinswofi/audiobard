@@ -9,7 +9,7 @@ with a built-in neural voice, or in the voice of anyone who gives you a short re
 
 - **28 built-in voices** from Kokoro-82M, American and British English, running on the CPU a few times faster than real time.
 - **Voice cloning** with Chatterbox Turbo: record ten to twenty seconds of someone speaking, or pick an audio file, and the whole book is narrated in that voice. English only.
-- **Chapter-aware output**: one WAV per chapter, or a single `.m4b` audiobook with chapter markers when `ffmpeg` is installed.
+- **Compact output**: a single `.m4b` audiobook with chapter markers, or one MP3 or OGG (Opus) file per chapter. Audio is streamed into the encoder as it is narrated, so nothing uncompressed is ever written to disk. WAV is only used when `ffmpeg` is missing.
 - **Resumable**: cancel any time. Finished chapters are kept and reused on the next run.
 - **Chapter selection**: untick front matter, licence text or anything else you do not want narrated.
 - **Voice preview** before committing to a multi-hour conversion.
@@ -18,7 +18,7 @@ with a built-in neural voice, or in the voice of anyone who gives you a short re
 ## Requirements
 
 - Node.js 20 or newer (for development and for the CLI).
-- Optional: `ffmpeg` on the PATH, for `.m4b` output.
+- `ffmpeg` on the PATH, for M4B, MP3 and OGG output. Without it Narrata falls back to WAV, which needs about 170 MB per hour of audio.
 - Optional, for voice cloning: Python 3.10+ with `venv` and `git`.
   On Debian, Ubuntu and Mint: `sudo apt install python3-venv git`.
 
@@ -48,8 +48,11 @@ node cli.js book.epub                                        # list chapters
 node cli.js book.epub --out ~/Audiobooks                     # narrate with Kokoro (voice af_heart)
 node cli.js book.epub --out ~/Audiobooks --voice bm_george --speed 1.1 --chapters 2-13
 node cli.js book.epub --out ~/Audiobooks --ref friend.wav    # clone a voice (after setup in the app)
-node cli.js book.epub --out ~/Audiobooks --keep-wav          # keep per-chapter WAVs next to the .m4b
+node cli.js book.epub --out ~/Audiobooks --format ogg        # m4b (default), mp3, ogg or wav
+node cli.js book.epub --out ~/Audiobooks --keep-chapters     # keep the per-chapter files next to the .m4b
 ```
+
+Approximate sizes per hour of narration: M4B and MP3 about 30 MB, OGG (Opus) about 18 MB, WAV about 170 MB.
 
 Voice ids are the Kokoro pack names: `af_*` and `am_*` are American female and male, `bf_*` and `bm_*`
 are British. See `lib/voices.js` for the full list with Kokoro's quality grades.
@@ -63,6 +66,9 @@ Hugging Face. Expect around two gigabytes in total.
 
 Cloning on a CPU is considerably slower than Kokoro, roughly real time on a modern laptop. Finished
 chapters are kept, so long books can be converted in several sittings.
+
+Narrata downloads only the three weight files the Turbo model reads, about 3 GB, rather than the
+full 4 GB repository.
 
 Tips for a good sample: ten to twenty seconds, one speaker, no music or background noise, natural
 reading pace.
@@ -89,10 +95,10 @@ lib/epub.js           container.xml -> OPF -> spine, chapter titles from nav or 
 lib/mobi.js           PalmDB records, PalmDOC decompression, KF7 and KF8 text, EXTH metadata
 lib/html.js           HTML to narration-friendly plain text
 lib/chunk.js          Sentence-aware chunking sized for each TTS model
-lib/wav.js            Streaming WAV writer and reader
+lib/wav.js            WAV reader for the sidecar's output, and the WAV fallback writer
 lib/kokoro.js         Kokoro model loading with download progress
 lib/clone.js          Python environment setup and the Chatterbox sidecar client
-lib/ffmpeg.js         Optional M4B encoding with chapter metadata
+lib/ffmpeg.js         Streaming MP3/OGG/AAC encoder and M4B assembly with chapter metadata
 lib/pipeline.js       The conversion job: book -> chunks -> speech -> files
 python/narrata_tts.py Chatterbox Turbo behind a JSON-lines protocol on stdin/stdout
 scripts/package.js    Builds the distributable with @electron/packager

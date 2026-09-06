@@ -135,7 +135,5 @@ copy, modify and share it for any noncommercial purpose, including personal use,
 education and use by charities and public institutions. Commercial use needs a separate licence
 from the author.
 
-Required Notice: Copyright Consty (https://github.com/suinswofi/narrata)
-
 Kokoro-82M is Apache 2.0. Chatterbox is MIT and applies an inaudible watermark to generated audio.
 Check each model's terms before distributing audio.

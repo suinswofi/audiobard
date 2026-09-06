@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import traceback
+import wave
 
 proto = os.fdopen(os.dup(1), "w", buffering=1)
 sys.stdout = sys.stderr
@@ -32,10 +33,19 @@ def keep_reference_float32(model):
     model.norm_loudness = norm_loudness
 
 
+def write_wav(path, wav, sr):
+    """16-bit mono PCM via the standard library. torchaudio.save needs TorchCodec from 2.9 on."""
+    pcm = (wav.squeeze().clamp(-1, 1) * 32767).round().to("cpu").short().numpy()
+    with wave.open(path, "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(sr)
+        f.writeframes(pcm.tobytes())
+
+
 def main():
     emit({"event": "status", "message": "Starting voice cloning engine (loading PyTorch)..."})
     import torch
-    import torchaudio
     from chatterbox.tts_turbo import REPO_ID, ChatterboxTurboTTS
     from huggingface_hub import snapshot_download
 
@@ -70,7 +80,7 @@ def main():
             elif op == "synth":
                 with torch.inference_mode():
                     wav = model.generate(req["text"], temperature=req.get("temperature", 0.8))
-                torchaudio.save(req["out"], wav.cpu(), model.sr, encoding="PCM_S", bits_per_sample=16)
+                write_wav(req["out"], wav, model.sr)
                 emit({"id": rid, "ok": True, "seconds": wav.shape[-1] / model.sr})
             elif op == "quit":
                 emit({"id": rid, "ok": True})

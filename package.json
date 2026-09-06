@@ -1,6 +1,6 @@
 {
   "name": "narrata",
-  "version": "0.1.3",
+  "version": "1.0.0",
   "description": "Turn any ebook into an audiobook with local TTS and voice cloning",
   "scripts": {
     "start": "electron .",

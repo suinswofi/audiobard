@@ -17,6 +17,21 @@ def emit(obj):
     proto.flush()
 
 
+def keep_reference_float32(model):
+    """Chatterbox scales the float32 reference waveform by a NumPy float64 scalar while
+    normalising its loudness. Under NumPy 2 promotion rules that silently turns the whole
+    waveform into float64, and the speech tokenizer then fails with "expected scalar type
+    Double but found Float". Pin the result back to float32 whatever NumPy does."""
+    import numpy as np
+
+    original = model.norm_loudness
+
+    def norm_loudness(wav, sr, **kwargs):
+        return np.asarray(original(wav, sr, **kwargs), dtype=np.float32)
+
+    model.norm_loudness = norm_loudness
+
+
 def main():
     emit({"event": "status", "message": "Starting voice cloning engine (loading PyTorch)..."})
     import torch
@@ -35,6 +50,7 @@ def main():
     )
     emit({"event": "status", "message": f"Loading Chatterbox Turbo on {device.upper()}..."})
     model = ChatterboxTurboTTS.from_local(ckpt_dir, device)
+    keep_reference_float32(model)
     emit({"event": "ready", "sr": model.sr, "device": device})
 
     for line in sys.stdin:
@@ -46,7 +62,10 @@ def main():
         try:
             op = req.get("op")
             if op == "ref":
-                model.prepare_conditionals(req["path"])
+                try:
+                    model.prepare_conditionals(req["path"])
+                except AssertionError:
+                    raise ValueError("The voice sample must be longer than 5 seconds.")
                 emit({"id": rid, "ok": True})
             elif op == "synth":
                 with torch.inference_mode():

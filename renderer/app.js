@@ -270,7 +270,7 @@ async function init() {
       $('#previewStatus').textContent = '';
     } catch (e) {
       showError(e.message);
-      $('#previewStatus').textContent = '';
+      $('#previewStatus').textContent = 'Preview failed. See the message below.';
     } finally {
       state.previewing = false;
       $('#preview').disabled = state.running;

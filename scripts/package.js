@@ -79,9 +79,11 @@ function archive(dir) {
       new RegExp(`^/node_modules/@img/sharp-(?!libvips-)(?!${plat}-${arch}(/|$))`),
       new RegExp(`^/node_modules/@img/sharp-libvips-(?!${plat}-${arch}(/|$))`),
       /^\/node_modules\/@huggingface\/transformers\/dist\/(?!transformers\.node\.)/,
-      /\.(map|md|ts)$/,
+      /^(?!\/LICENSE\.md$).*\.(map|md|ts)$/,
     ],
   });
+  // Narrata's own licence next to the executable, alongside Electron's LICENSE and LICENSES.chromium.html.
+  fs.copyFileSync(path.join(root, 'LICENSE.md'), path.join(dir, 'LICENSE.md'));
   console.log(`Packaged: ${dir}`);
   if (args.includes('--archive')) {
     const file = archive(dir);

@@ -130,6 +130,17 @@ Booklark was called Narrata up to version 1.0.0. On first start, the models, Pyt
 recorded samples are moved out of the old `Narrata` (app) and `narrata` (CLI) directories, so nothing
 is downloaded twice.
 
+## Responsible use of voice cloning
+
+Clone only voices you have permission to use: your own, or that of someone who has recorded a
+sample for you knowing what it is for. Booklark is built for narrating books you own in a voice
+you are entitled to use, not for imitating a person without their consent.
+
+Do not use it to impersonate anyone, to put words in someone's mouth, or to produce audio that
+misleads a listener about who is speaking. Depending on where you live, this can also be illegal.
+Chatterbox stamps an inaudible watermark on everything it generates, so cloned audio remains
+identifiable as synthetic.
+
 ## Limitations
 
 - DRM-protected books are refused. Remove the DRM first with a tool you are entitled to use.

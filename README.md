@@ -5,6 +5,10 @@ Turn any DRM-free ebook into an audiobook, entirely on your own computer.
 Pick an EPUB, MOBI or AZW3, choose a voice, press **Create audiobook**. Narrata reads the book aloud
 with a built-in neural voice, or in the voice of anyone who gives you a short recording.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Narrata with Alice's Adventures in Wonderland loaded, ready to narrate" width="620">
+</p>
+
 ## Features
 
 - **28 built-in voices** from Kokoro-82M, American and British English, running on the CPU a few times faster than real time.

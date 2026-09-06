@@ -1,12 +1,12 @@
-# Narrata
+# Booklark
 
 Turn any DRM-free ebook into an audiobook, entirely on your own computer.
 
-Pick an EPUB, MOBI or AZW3, choose a voice, press **Create audiobook**. Narrata reads the book aloud
+Pick an EPUB, MOBI or AZW3, choose a voice, press **Create audiobook**. Booklark reads the book aloud
 with a built-in neural voice, or in the voice of anyone who gives you a short recording.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Narrata with Alice's Adventures in Wonderland loaded, ready to narrate" width="620">
+  <img src="docs/screenshot.png" alt="Booklark with Alice's Adventures in Wonderland loaded, ready to narrate" width="620">
 </p>
 
 ## Features
@@ -22,7 +22,7 @@ with a built-in neural voice, or in the voice of anyone who gives you a short re
 ## Requirements
 
 - Node.js 20 or newer (for development and for the CLI).
-- `ffmpeg` on the PATH, for M4B, MP3 and OGG output. Without it Narrata falls back to WAV, which needs about 170 MB per hour of audio.
+- `ffmpeg` on the PATH, for M4B, MP3 and OGG output. Without it Booklark falls back to WAV, which needs about 170 MB per hour of audio.
 - Optional, for voice cloning: Python 3.10+ with `venv` and `git`.
   On Debian, Ubuntu and Mint: `sudo apt install python3-venv git`.
 
@@ -39,7 +39,7 @@ npm start
 npm run package
 ```
 
-Produces `dist/Narrata-<platform>-<arch>/` with a `narrata` executable inside. The packaging script
+Produces `dist/Booklark-<platform>-<arch>/` with a `booklark` executable inside. The packaging script
 removes ONNX Runtime binaries for other platforms and the CUDA/TensorRT providers, which are most of
 the weight of `node_modules`.
 
@@ -67,7 +67,7 @@ are British. See `lib/voices.js` for the full list with Kokoro's quality grades.
 
 ## Voice cloning setup
 
-In the app, choose **Clone a voice from a sample** and press **Set up voice cloning**. Narrata creates
+In the app, choose **Clone a voice from a sample** and press **Set up voice cloning**. Booklark creates
 a private virtual environment in its data directory and installs PyTorch (CPU build unless an NVIDIA
 GPU is detected) plus `chatterbox-tts`. The first synthesis downloads the Chatterbox Turbo model from
 Hugging Face. Expect around two gigabytes in total.
@@ -75,7 +75,7 @@ Hugging Face. Expect around two gigabytes in total.
 Cloning on a CPU is considerably slower than Kokoro, roughly real time on a modern laptop. Finished
 chapters are kept, so long books can be converted in several sittings.
 
-Narrata downloads only the three weight files the Turbo model reads, about 3 GB, rather than the
+Booklark downloads only the three weight files the Turbo model reads, about 3 GB, rather than the
 full 4 GB repository.
 
 Tips for a good sample: ten to twenty seconds, one speaker, no music or background noise, natural
@@ -108,7 +108,8 @@ lib/kokoro.js         Kokoro model loading with download progress
 lib/clone.js          Python environment setup and the Chatterbox sidecar client
 lib/ffmpeg.js         Streaming MP3/OGG/AAC encoder and M4B assembly with chapter metadata
 lib/pipeline.js       The conversion job: book -> chunks -> speech -> files
-python/narrata_tts.py Chatterbox Turbo behind a JSON-lines protocol on stdin/stdout
+lib/migrate.js        One-time move of data from the pre-1.1 Narrata directory
+python/booklark_tts.py Chatterbox Turbo behind a JSON-lines protocol on stdin/stdout
 scripts/package.js    Builds the distributable with @electron/packager
 ```
 
@@ -122,8 +123,12 @@ scripts/package.js    Builds the distributable with @electron/packager
 | Recorded samples | `<userData>/samples` |
 | Default output | `~/Music/Audiobooks` |
 
-`<userData>` is `~/.config/narrata` on Linux, `~/Library/Application Support/narrata` on macOS and
-`%APPDATA%\narrata` on Windows. The CLI uses `~/.config/narrata` on every platform.
+`<userData>` is `~/.config/booklark` on Linux, `~/Library/Application Support/booklark` on macOS and
+`%APPDATA%\booklark` on Windows. The CLI uses `~/.config/booklark` on every platform.
+
+Booklark was called Narrata up to version 1.0.0. On first start, the models, Python environment and
+recorded samples are moved out of the old `Narrata` (app) and `narrata` (CLI) directories, so nothing
+is downloaded twice.
 
 ## Limitations
 
@@ -134,7 +139,7 @@ scripts/package.js    Builds the distributable with @electron/packager
 
 ## Licence
 
-Narrata is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use,
+Booklark is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use,
 copy, modify and share it for any noncommercial purpose, including personal use, research,
 education and use by charities and public institutions. Commercial use needs a separate licence
 from the author.

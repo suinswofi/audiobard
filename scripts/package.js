@@ -1,5 +1,5 @@
 'use strict';
-// Bundles Narrata into dist/. Prunes the parts of node_modules that only exist for other
+// Bundles Booklark into dist/. Prunes the parts of node_modules that only exist for other
 // platforms or for GPUs, which is most of their size.
 //
 //   node scripts/package.js                         current platform
@@ -30,7 +30,7 @@ function ensureSharpFor(platform, cpu) {
     const dest = path.join(root, 'node_modules', pkg);
     if (fs.existsSync(dest)) continue;
     console.log(`Fetching ${pkg}@${version} for the ${platform} build...`);
-    const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'narrata-pack-'));
+    const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'booklark-pack-'));
     const r = spawnSync('npm', ['pack', `${pkg}@${version}`, '--pack-destination', tmp, '--silent'], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`Could not fetch ${pkg}: ${r.stderr}`);
     const tarball = fs.readdirSync(tmp).find((f) => f.endsWith('.tgz'));
@@ -61,8 +61,8 @@ function archive(dir) {
   const [dir] = await packager({
     dir: root,
     out,
-    name: 'Narrata',
-    executableName: 'narrata',
+    name: 'Booklark',
+    executableName: 'booklark',
     platform: plat,
     arch,
     overwrite: true,
@@ -82,7 +82,7 @@ function archive(dir) {
       /^(?!\/LICENSE\.md$).*\.(map|md|ts)$/,
     ],
   });
-  // Narrata's own licence next to the executable, alongside Electron's LICENSE and LICENSES.chromium.html.
+  // Booklark's own licence next to the executable, alongside Electron's LICENSE and LICENSES.chromium.html.
   fs.copyFileSync(path.join(root, 'LICENSE.md'), path.join(dir, 'LICENSE.md'));
   console.log(`Packaged: ${dir}`);
   if (args.includes('--archive')) {

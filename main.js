@@ -7,14 +7,16 @@ const { findFfmpeg } = require('./lib/ffmpeg');
 const { findSystemPython, isInstalled, install } = require('./lib/clone');
 const { floatToPcm16, writeWav } = require('./lib/wav');
 const { VOICES } = require('./lib/voices');
+const { migrateUserData } = require('./lib/migrate');
 
 const userData = app.getPath('userData');
+migrateUserData(userData, 'Narrata');
 const dirs = {
   models: path.join(userData, 'models'),
   venv: path.join(userData, 'venv'),
   samples: path.join(userData, 'samples'),
 };
-const cloneScript = path.join(__dirname, 'python', 'narrata_tts.py');
+const cloneScript = path.join(__dirname, 'python', 'booklark_tts.py');
 
 let win = null;
 let worker = null;
@@ -22,7 +24,7 @@ let nextId = 1;
 const pending = new Map();
 
 function startWorker() {
-  worker = utilityProcess.fork(path.join(__dirname, 'worker.js'), [], { serviceName: 'narrata-worker', stdio: 'inherit' });
+  worker = utilityProcess.fork(path.join(__dirname, 'worker.js'), [], { serviceName: 'booklark-worker', stdio: 'inherit' });
   worker.on('message', (msg) => {
     if (msg.id && pending.has(msg.id)) {
       const p = pending.get(msg.id);
@@ -61,7 +63,7 @@ function createWindow() {
     height: 860,
     minWidth: 600,
     minHeight: 600,
-    title: 'Narrata',
+    title: 'Booklark',
     autoHideMenuBar: true,
     backgroundColor: '#f6f4ef',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },

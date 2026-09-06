@@ -1,4 +1,4 @@
-"""Narrata voice-cloning sidecar: Chatterbox Turbo behind a JSON-lines protocol.
+"""Booklark voice-cloning sidecar: Chatterbox Turbo behind a JSON-lines protocol.
 
 Requests arrive on stdin, one JSON object per line; replies go to a private copy
 of stdout so library chatter can never corrupt the protocol channel.

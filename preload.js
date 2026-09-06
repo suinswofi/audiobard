@@ -2,7 +2,7 @@
 // Runs sandboxed: only `electron` may be required here, everything else goes through IPC.
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('narrata', {
+contextBridge.exposeInMainWorld('booklark', {
   env: () => ipcRenderer.invoke('env'),
   pickBook: () => ipcRenderer.invoke('pick-book'),
   pickAudio: () => ipcRenderer.invoke('pick-audio'),

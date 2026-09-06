@@ -11,6 +11,7 @@ const path = require('node:path');
 const { parseBook } = require('./lib/book');
 const { findFfmpeg } = require('./lib/ffmpeg');
 const pipeline = require('./lib/pipeline');
+const { migrateUserData } = require('./lib/migrate');
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
@@ -32,14 +33,15 @@ if (!outDir) {
 }
 
 const home = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-const userData = path.join(home, 'narrata');
+const userData = path.join(home, 'booklark');
+migrateUserData(userData, 'narrata');
 const job = {
   book, outDir, chapters,
   engine: opt('ref') ? 'clone' : 'kokoro',
   voice: opt('voice', 'af_heart'), speed: Number(opt('speed', 1)), refAudio: opt('ref'),
   format: opt('format'), keepChapters: args.includes('--keep-chapters'),
   cacheDir: path.join(userData, 'models'), venvDir: path.join(userData, 'venv'),
-  cloneScript: path.join(__dirname, 'python', 'narrata_tts.py'), ffmpeg: findFfmpeg(),
+  cloneScript: path.join(__dirname, 'python', 'booklark_tts.py'), ffmpeg: findFfmpeg(),
 };
 
 let cancelled = false;

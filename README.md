@@ -128,7 +128,14 @@ scripts/package.js    Builds the distributable with @electron/packager
 - Voice cloning is English only. Kokoro voices are English only in this build.
 - Pronunciation of unusual names and abbreviations depends on the model.
 
-## Licences
+## Licence
 
-Narrata's own code is ISC. Kokoro-82M is Apache 2.0. Chatterbox is MIT and applies an inaudible
-watermark to generated audio. Check each model's terms before distributing audio commercially.
+Narrata is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may use,
+copy, modify and share it for any noncommercial purpose, including personal use, research,
+education and use by charities and public institutions. Commercial use needs a separate licence
+from the author.
+
+Required Notice: Copyright Consty (https://github.com/suinswofi/narrata)
+
+Kokoro-82M is Apache 2.0. Chatterbox is MIT and applies an inaudible watermark to generated audio.
+Check each model's terms before distributing audio.

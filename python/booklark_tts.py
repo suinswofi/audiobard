@@ -43,62 +43,110 @@ def write_wav(path, wav, sr):
         f.writeframes(pcm.tobytes())
 
 
-GPU_PROBE = r"""
-import json, sys, torch
-if not torch.cuda.is_available():
-    sys.exit(3)
-# Prefer the device with the most memory: on a desktop with a discrete card, the CPU's built-in
-# GPU is also listed and is often unsupported or too small.
-best = max(range(torch.cuda.device_count()), key=lambda i: torch.cuda.get_device_properties(i).total_memory)
-torch.cuda.set_device(best)
-x = torch.randn(256, 256, device="cuda")
-(x @ x).sum().item()
+GPU_COUNT = r"""
+import torch
+print(torch.cuda.device_count() if torch.cuda.is_available() else 0)
+"""
+
+# Runs with exactly one device visible. Times a few matrix products so the fastest card wins:
+# memory is no guide, since integrated graphics report the whole of system RAM as theirs.
+GPU_BENCH = r"""
+import json, math, time, torch
+if not torch.cuda.is_available() or torch.cuda.device_count() < 1:
+    raise SystemExit(3)
+p = torch.cuda.get_device_properties(0)
+x = torch.randn(1024, 1024, device="cuda")
+if not math.isfinite((x @ x).sum().item()):
+    raise SystemExit("matrix product on the GPU returned a non-finite result")
 torch.cuda.synchronize()
-p = torch.cuda.get_device_properties(best)
-print(json.dumps({"index": best, "name": p.name, "backend": "ROCm" if torch.version.hip else "CUDA"}))
+t = time.perf_counter()
+y = x
+for _ in range(20):
+    y = x @ y
+torch.cuda.synchronize()
+gflops = 20 * 2 * 1024 ** 3 / (time.perf_counter() - t) / 1e9
+print(json.dumps({"name": p.name, "memory_mb": p.total_memory // 2 ** 20, "gflops": gflops,
+                  "backend": "ROCm" if torch.version.hip else "CUDA"}))
 """
 
 
-def probe_gpu():
-    """Find a working GPU, or None. Runs in a child process: a CUDA build without a driver, or a
-    ROCm build on a card it has no kernels for, can abort the interpreter instead of raising."""
+def run_python(code, env=None, timeout=300):
     import subprocess
 
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=timeout, env=env)
+
+
+def with_visible_gpu(dev):
+    """Environment that shows torch a single device. Both variables are set: HIP reads either."""
+    env = dict(os.environ)
+    env["CUDA_VISIBLE_DEVICES"] = dev
+    env["HIP_VISIBLE_DEVICES"] = dev
+    return env
+
+
+def log(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+
+def probe_gpus():
+    """Pick the fastest working GPU, or None. Every step runs in a child process: a CUDA build
+    without a driver, or a ROCm build on a card it has no kernels for, can abort the interpreter
+    instead of raising, and one bad device must not take the good one down with it."""
     try:
-        r = subprocess.run([sys.executable, "-c", GPU_PROBE], capture_output=True, text=True, timeout=300)
-    except Exception as e:  # timeout, or the interpreter could not even start
-        print("GPU probe did not finish: %s" % e, file=sys.stderr)
+        r = run_python(GPU_COUNT)
+    except Exception as e:
+        log("GPU enumeration did not finish: %s" % e)
         return None
-    if r.returncode == 3:
-        return None  # torch built without GPU support, or no device found
     if r.returncode != 0:
-        print("GPU probe failed (exit %d):\n%s" % (r.returncode, r.stderr.strip()[-2000:]), file=sys.stderr)
+        log("GPU enumeration failed (exit %d):\n%s" % (r.returncode, r.stderr.strip()[-2000:]))
         return None
     try:
-        return json.loads(r.stdout.strip().splitlines()[-1])
-    except Exception:
+        count = int(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        count = 0
+    if count == 0:
         return None
+    # Respect a device list the user already chose; otherwise every device by index.
+    preset = os.environ.get("HIP_VISIBLE_DEVICES") or os.environ.get("CUDA_VISIBLE_DEVICES")
+    ids = [d.strip() for d in preset.split(",") if d.strip()] if preset else [str(i) for i in range(count)]
+    best = None
+    for n, dev in enumerate(ids):
+        emit({"event": "status", "message": "Testing GPU %d of %d..." % (n + 1, len(ids))})
+        try:
+            r = run_python(GPU_BENCH, env=with_visible_gpu(dev), timeout=120)
+        except Exception as e:
+            log("GPU %s: test did not finish (%s)" % (dev, e))
+            continue
+        if r.returncode != 0:
+            log("GPU %s: test failed (exit %d):\n%s" % (dev, r.returncode, r.stderr.strip()[-2000:]))
+            continue
+        try:
+            info = json.loads(r.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            log("GPU %s: test produced no result" % dev)
+            continue
+        info["id"] = dev
+        log("GPU %s: %s, %d MB, about %.0f GFLOPS" % (dev, info["name"], info["memory_mb"], info["gflops"]))
+        if best is None or info["gflops"] > best["gflops"]:
+            best = info
+    return best
 
 
 def main():
     emit({"event": "status", "message": "Starting voice cloning engine (loading PyTorch)..."})
     emit({"event": "status", "message": "Checking for a usable GPU..."})
-    gpu = probe_gpu()
-    if gpu is None:
-        # Hide every device so nothing in Chatterbox or torch touches a GPU that failed the probe.
-        os.environ["CUDA_VISIBLE_DEVICES"] = ""
-        os.environ["HIP_VISIBLE_DEVICES"] = ""
+    gpu = probe_gpus()
+    # Show torch only the chosen device, or none at all, before it initialises: nothing in
+    # Chatterbox can then land on an integrated GPU or on a card that failed its test.
+    os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["HIP_VISIBLE_DEVICES"] = gpu["id"] if gpu else ""
     import torch
     from chatterbox.tts_turbo import REPO_ID, ChatterboxTurboTTS
     from huggingface_hub import snapshot_download
 
-    device, label = "cpu", "CPU"
-    if gpu is not None:
-        try:
-            torch.cuda.set_device(gpu["index"])
-            device, label = "cuda", "%s, %s" % (gpu["backend"], gpu["name"])
-        except Exception as e:  # passed in the child process but not here: stay on the CPU
-            print("Could not select GPU %r: %s" % (gpu, e), file=sys.stderr)
+    if gpu is None:
+        device, label = "cpu", "CPU"
+    else:
+        device, label = "cuda", "%s, %s" % (gpu["backend"], gpu["name"])
 
     emit({"event": "status", "message": "Downloading Chatterbox Turbo (about 3 GB on first run)..."})
     # Chatterbox's own from_pretrained fetches every *.safetensors in the repo, including a

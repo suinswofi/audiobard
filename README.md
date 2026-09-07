@@ -87,8 +87,9 @@ Setup picks the PyTorch build to match the machine:
 
 At start-up the voice engine tests the GPU in a separate process and uses it only if the test
 passes. If the test fails, or the model later fails to load or run on the GPU, the engine switches
-to the CPU on its own and carries on. With two GPUs, for example a processor's built-in graphics
-next to a discrete card, the one with the most memory is used.
+to the CPU on its own and carries on. With several GPUs, for example a processor's built-in
+graphics next to a discrete card, each is tested in turn and the fastest one is used. Set
+`HIP_VISIBLE_DEVICES` or `CUDA_VISIBLE_DEVICES` to restrict the choice.
 
 If voice cloning was set up before a GPU was available, or on a Booklark version that only knew
 about NVIDIA, the app offers **Set up again for the GPU**. Re-running setup swaps the PyTorch build
@@ -145,6 +146,7 @@ scripts/package.js    Builds the distributable with @electron/packager
 | What | Location |
 | --- | --- |
 | Kokoro model | `<userData>/models` |
+| Engine log (status lines, voice engine output, setup output; rewritten on each start) | `<userData>/engine.log` |
 | Chatterbox model | Hugging Face cache (`~/.cache/huggingface`) |
 | Python environment | `<userData>/venv` |
 | Recorded samples | `<userData>/samples` |

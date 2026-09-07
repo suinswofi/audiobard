@@ -18,6 +18,14 @@ const dirs = {
 };
 const cloneScript = path.join(__dirname, 'python', 'booklark_tts.py');
 
+// Engine status and log lines, fresh for each run of the app. The window shows only the latest
+// status, so this is where to look when the voice engine did something unexpected.
+const engineLog = path.join(userData, 'engine.log');
+try { fs.writeFileSync(engineLog, `Booklark ${app.getVersion()} started ${new Date().toISOString()}\n`); } catch { /* logging is best effort */ }
+function logLine(line) {
+  try { fs.appendFileSync(engineLog, `${new Date().toISOString().slice(11, 19)} ${line}\n`); } catch { /* best effort */ }
+}
+
 let win = null;
 let worker = null;
 let nextId = 1;
@@ -30,8 +38,9 @@ function startWorker() {
       const p = pending.get(msg.id);
       pending.delete(msg.id);
       msg.error ? p.reject(new Error(msg.error)) : p.resolve(msg.result);
-    } else if (win && !win.isDestroyed()) {
-      win.webContents.send('worker-event', msg);
+    } else {
+      if (['status', 'log', 'warning', 'error'].includes(msg.type)) logLine(`[${msg.type}] ${msg.message}`);
+      if (win && !win.isDestroyed()) win.webContents.send('worker-event', msg);
     }
   });
   worker.on('exit', (code) => {
@@ -109,7 +118,7 @@ ipcMain.handle('save-recording', (_e, samples, rate) => {
 let installing = null;
 ipcMain.handle('install-clone', async () => {
   if (!installing) {
-    installing = install(dirs.venv, { onLine: (line) => win && !win.isDestroyed() && win.webContents.send('install-log', line) })
+    installing = install(dirs.venv, { onLine: (line) => { logLine(`[setup] ${line}`); if (win && !win.isDestroyed()) win.webContents.send('install-log', line); } })
       .finally(() => { installing = null; });
   }
   return installing;

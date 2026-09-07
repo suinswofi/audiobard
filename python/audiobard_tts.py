@@ -162,8 +162,12 @@ def main():
     stages = {}
 
     def timed(obj, name, key):
-        """Wrap a method so each call's wall time lands in stages[key]."""
-        f = getattr(obj, name)
+        """Wrap a method so each call's wall time lands in stages[key]. Timing is a log line only,
+        so a Chatterbox release that renames the method must cost the line, not voice cloning."""
+        f = getattr(obj, name, None)
+        if not callable(f):
+            log("no %s.%s to time; stage timings will be missing from the log" % (type(obj).__name__, name))
+            return
 
         def g(*a, **k):
             t = time.perf_counter()

@@ -76,6 +76,12 @@ per-chapter writer → optional M4B assembly. Key behaviours to preserve when ed
 
 ### Engines
 
+The engines are mutually exclusive per job: `getSynth` in `lib/pipeline.js` returns one
+`synth(text)` function chosen by `job.engine`, and every chunk (and the preview) goes through it.
+With `clone` selected Kokoro is never loaded; `lib/kokoro.js` only requires `kokoro-js` and
+transformers inside `loadKokoro`, so no ONNX model is downloaded or held in memory. The only
+shared step is chunking, which uses a smaller chunk size for cloning.
+
 - **Kokoro** (`lib/kokoro.js`): loads via `kokoro-js` with the HF cache pointed at
   `<userData>/models`; always CPU. Voice ids and quality grades live in `lib/voices.js`.
 - **Clone** (`lib/clone.js` + `python/audiobard_tts.py`): `install()` creates a venv in

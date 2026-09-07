@@ -26,6 +26,12 @@ with a built-in neural voice, or in the voice of anyone who gives you a short re
 - Optional, for voice cloning: Python 3.10+ with `venv`.
   On Debian, Ubuntu and Mint: `sudo apt install python3-venv`.
 
+## Download
+
+Prebuilt 64-bit Linux and Windows builds are on the
+[releases page](https://github.com/suinswofi/audiobard/releases). Extract the archive and run
+`audiobard` (or `audiobard.exe`). The builds are unsigned, so Windows SmartScreen asks once.
+
 ## Run the app
 
 ```sh

@@ -68,12 +68,39 @@ are British. See `lib/voices.js` for the full list with Kokoro's quality grades.
 ## Voice cloning setup
 
 In the app, choose **Clone a voice from a sample** and press **Set up voice cloning**. Booklark creates
-a private virtual environment in its data directory and installs PyTorch (CPU build unless an NVIDIA
-GPU is detected) plus `chatterbox-tts`. The first synthesis downloads the Chatterbox Turbo model from
-Hugging Face. Expect around two gigabytes in total.
+a private virtual environment in its data directory and installs PyTorch plus `chatterbox-tts`. The
+first synthesis downloads the Chatterbox Turbo model from Hugging Face. Expect around two gigabytes
+in total with the CPU build of PyTorch, and three to four with a GPU build.
 
 Cloning on a CPU is considerably slower than Kokoro, roughly real time on a modern laptop. Finished
 chapters are kept, so long books can be converted in several sittings.
+
+### GPU acceleration for voice cloning
+
+Setup picks the PyTorch build to match the machine:
+
+| Detected | PyTorch build | How it is detected |
+| --- | --- | --- |
+| NVIDIA GPU | CUDA 12.6 | `nvidia-smi` runs successfully |
+| AMD GPU on Linux | ROCm | `/dev/kfd` exists and a display device reports AMD's vendor id |
+| Anything else | CPU | |
+
+At start-up the voice engine tests the GPU in a separate process and uses it only if the test
+passes. If the test fails, or the model later fails to load or run on the GPU, the engine switches
+to the CPU on its own and carries on. With two GPUs, for example a processor's built-in graphics
+next to a discrete card, the one with the most memory is used.
+
+If voice cloning was set up before a GPU was available, or on a Booklark version that only knew
+about NVIDIA, the app offers **Set up again for the GPU**. Re-running setup swaps the PyTorch build
+in place. Kokoro always runs on the CPU, where it is already several times faster than real time.
+
+Notes for AMD cards: the ROCm wheel bundles the ROCm libraries, so nothing beyond the ordinary open
+source `amdgpu` kernel driver has to be installed. Your user must be able to open `/dev/kfd`, which
+usually means membership in the `render` group (`sudo usermod -aG render $USER`, then log in
+again). AMD ships kernels for a limited set of chips per generation; if the GPU test fails on a
+card that should work, setting `HSA_OVERRIDE_GFX_VERSION` (for example `11.0.0` for RDNA3 or
+`10.3.0` for RDNA2) in the environment Booklark starts from usually fixes it, and the variable is
+passed through to the engine. On macOS the standard wheel is installed and cloning runs on the CPU.
 
 Booklark downloads only the three weight files the Turbo model reads, about 3 GB, rather than the
 full 4 GB repository.

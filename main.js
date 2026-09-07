@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { EXTENSIONS } = require('./lib/book');
 const { findFfmpeg } = require('./lib/ffmpeg');
-const { findSystemPython, isInstalled, install } = require('./lib/clone');
+const { findSystemPython, isInstalled, installedBuild, detectGpu, install } = require('./lib/clone');
 const { floatToPcm16, writeWav } = require('./lib/wav');
 const { VOICES } = require('./lib/voices');
 const { migrateUserData } = require('./lib/migrate');
@@ -76,6 +76,8 @@ ipcMain.handle('env', () => ({
   ffmpeg: !!findFfmpeg(),
   python: findSystemPython(),
   cloneReady: isInstalled(dirs.venv),
+  cloneBuild: installedBuild(dirs.venv),
+  cloneGpu: detectGpu(),
   defaultOutDir: defaultOutDir(),
   platform: process.platform,
 }));
@@ -110,8 +112,7 @@ ipcMain.handle('install-clone', async () => {
     installing = install(dirs.venv, { onLine: (line) => win && !win.isDestroyed() && win.webContents.send('install-log', line) })
       .finally(() => { installing = null; });
   }
-  await installing;
-  return true;
+  return installing;
 });
 
 const jobEnv = () => ({ cacheDir: dirs.models, venvDir: dirs.venv, cloneScript, ffmpeg: findFfmpeg() });

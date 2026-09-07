@@ -94,11 +94,18 @@ function updateSummary() {
 function refreshCloneUI() {
   const { env } = state;
   const ready = env.cloneReady;
-  $('#cloneSetup').hidden = ready;
+  // Installed for the CPU (or another GPU stack) on a machine that now has a usable GPU: offer to redo setup.
+  const gpuUpgrade = ready && env.cloneGpu && env.cloneBuild !== env.cloneGpu;
+  const gpuName = { cuda: 'an NVIDIA GPU', rocm: 'an AMD GPU' }[env.cloneGpu];
+  const buildName = { cuda: 'CUDA', rocm: 'ROCm', cpu: 'the CPU' };
+  $('#cloneSetup').hidden = ready && !gpuUpgrade;
   $('#cloneSample').hidden = !ready;
-  $('#cloneSetupText').textContent = env.python
-    ? `One-time setup: creates a private Python environment and downloads Chatterbox Turbo (about 2 GB). Found Python ${env.python.version}.`
-    : 'Voice cloning needs Python 3.10 or newer installed on this computer. Install Python, then restart Booklark.';
+  $('#cloneSetupText').textContent = !env.python
+    ? 'Voice cloning needs Python 3.10 or newer installed on this computer. Install Python, then restart Booklark.'
+    : gpuUpgrade
+      ? `Voice cloning is set up for ${buildName[env.cloneBuild] || env.cloneBuild}, but ${gpuName} was detected. Set up again to narrate on it (downloads about 3 GB). If the GPU turns out to be unsupported, Booklark falls back to the CPU by itself.`
+      : `One-time setup: creates a private Python environment and downloads Chatterbox Turbo (about 2 GB${env.cloneGpu ? `, plus the ${buildName[env.cloneGpu]} build of PyTorch for ${gpuName}` : ''}). Found Python ${env.python.version}.`;
+  $('#installClone').textContent = gpuUpgrade ? 'Set up again for the GPU' : 'Set up voice cloning';
   $('#installClone').disabled = !env.python;
 }
 
@@ -232,8 +239,10 @@ async function init() {
     $('#installClone').disabled = true;
     $('#installStatus').textContent = 'Installing… this takes a few minutes.';
     try {
-      await booklark.installClone();
+      const build = await booklark.installClone();
       state.env.cloneReady = true;
+      state.env.cloneBuild = typeof build === 'string' ? build : state.env.cloneGpu || 'cpu';
+      $('#installStatus').textContent = '';
       refreshCloneUI();
     } catch (e) {
       showError(e.message);

@@ -30,12 +30,13 @@ function fillFormats() {
 function updateFormatUI() {
   $('#formatHint').textContent = state.env.ffmpeg
     ? FORMATS[state.format].hint
-    : 'ffmpeg was not found on this computer. Install it and restart Booklark to enable M4B, MP3 and OGG output.';
+    : 'ffmpeg was not found on this computer. Install it and restart Audiobard to enable M4B, MP3 and OGG output.';
   $('#keepChaptersLabel').hidden = state.format !== 'm4b';
 }
 
 const fmtDuration = (s) => {
-  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  const minutes = Math.round(s / 60);
+  const h = Math.floor(minutes / 60), m = minutes % 60;
   return h ? `${h} h ${m} min` : `${m} min`;
 };
 
@@ -101,9 +102,9 @@ function refreshCloneUI() {
   $('#cloneSetup').hidden = ready && !gpuUpgrade;
   $('#cloneSample').hidden = !ready;
   $('#cloneSetupText').textContent = !env.python
-    ? 'Voice cloning needs Python 3.10 or newer installed on this computer. Install Python, then restart Booklark.'
+    ? 'Voice cloning needs Python 3.10 or newer installed on this computer. Install Python, then restart Audiobard.'
     : gpuUpgrade
-      ? `Voice cloning is set up for ${buildName[env.cloneBuild] || env.cloneBuild}, but ${gpuName} was detected. Set up again to narrate on it (downloads about 3 GB). If the GPU turns out to be unsupported, Booklark falls back to the CPU by itself.`
+      ? `Voice cloning is set up for ${buildName[env.cloneBuild] || env.cloneBuild}, but ${gpuName} was detected. Set up again to narrate on it (downloads about 3 GB). If the GPU turns out to be unsupported, Audiobard falls back to the CPU by itself.`
       : `One-time setup: creates a private Python environment and downloads Chatterbox Turbo (about 2 GB${env.cloneGpu ? `, plus the ${buildName[env.cloneGpu]} build of PyTorch for ${gpuName}` : ''}). Found Python ${env.python.version}.`;
   $('#installClone').textContent = gpuUpgrade ? 'Set up again for the GPU' : 'Set up voice cloning';
   $('#installClone').disabled = !env.python;
@@ -140,7 +141,7 @@ function handleEvent(ev) {
       $('#result').hidden = false;
       const target = ev.m4b || ev.dir;
       $('#resultText').textContent = `${fmtDuration(ev.seconds)} of audio → ${target}`;
-      $('#openResult').onclick = () => (ev.m4b ? booklark.showInFolder(ev.m4b) : booklark.openPath(ev.dir));
+      $('#openResult').onclick = () => (ev.m4b ? audiobard.showInFolder(ev.m4b) : audiobard.openPath(ev.dir));
       break;
     }
     case 'cancelled': setRunning(false); $('#status').textContent = 'Cancelled. Finished chapters were kept and will be reused next time.'; break;
@@ -180,7 +181,7 @@ async function stopRecording() {
   $('#record').hidden = false;
   $('#stopRecord').hidden = true;
   $('#recTime').textContent = '';
-  state.ref = await booklark.saveRecording(merged.buffer, rate);
+  state.ref = await audiobard.saveRecording(merged.buffer, rate);
   $('#refInfo').textContent = `Recorded ${(total / rate).toFixed(1)} s → ${state.ref}`;
 }
 
@@ -195,14 +196,14 @@ function checkVoiceReady() {
 }
 
 async function init() {
-  state.env = await booklark.env();
+  state.env = await audiobard.env();
   state.outDir = state.env.defaultOutDir;
   $('#outDir').textContent = state.outDir;
   fillVoices();
   fillFormats();
   refreshCloneUI();
-  booklark.onEvent(handleEvent);
-  booklark.onInstallLog((line) => {
+  audiobard.onEvent(handleEvent);
+  audiobard.onInstallLog((line) => {
     const log = $('#installLog');
     log.hidden = false;
     log.textContent += line + '\n';
@@ -212,7 +213,7 @@ async function init() {
   $('#pickBook').onclick = async () => {
     showError(null);
     try {
-      const res = await booklark.pickBook();
+      const res = await audiobard.pickBook();
       if (!res) return;
       state.file = res.file;
       state.book = res.book;
@@ -239,7 +240,7 @@ async function init() {
     $('#installClone').disabled = true;
     $('#installStatus').textContent = 'Installing… this takes a few minutes.';
     try {
-      const build = await booklark.installClone();
+      const build = await audiobard.installClone();
       state.env.cloneReady = true;
       state.env.cloneBuild = typeof build === 'string' ? build : state.env.cloneGpu || 'cpu';
       $('#installStatus').textContent = '';
@@ -250,7 +251,7 @@ async function init() {
     } finally { $('#installClone').disabled = false; }
   };
   $('#pickRef').onclick = async () => {
-    const f = await booklark.pickAudio();
+    const f = await audiobard.pickAudio();
     if (f) { state.ref = f; $('#refInfo').textContent = f; }
   };
   $('#record').onclick = () => startRecording().catch((e) => showError(`Could not start recording: ${e.message}`));
@@ -264,7 +265,7 @@ async function init() {
     $('#preview').disabled = true;
     $('#previewStatus').textContent = 'Generating preview…';
     try {
-      const { pcm, rate } = await booklark.preview(voiceOptions());
+      const { pcm, rate } = await audiobard.preview(voiceOptions());
       const bytes = Uint8Array.from(atob(pcm), (c) => c.charCodeAt(0));
       const header = new DataView(new ArrayBuffer(44));
       const str = (o, s) => [...s].forEach((ch, i) => header.setUint8(o + i, ch.charCodeAt(0)));
@@ -287,7 +288,7 @@ async function init() {
   };
 
   $('#pickOutDir').onclick = async () => {
-    const d = await booklark.pickOutDir(state.outDir);
+    const d = await audiobard.pickOutDir(state.outDir);
     if (d) { state.outDir = d; $('#outDir').textContent = d; }
   };
   $('#format').onchange = (e) => { state.format = e.target.value; updateFormatUI(); };
@@ -304,13 +305,13 @@ async function init() {
     $('#progressText').textContent = 'Starting…';
     setRunning(true);
     try {
-      await booklark.start({ file: state.file, chapters: [...state.selected].sort((a, b) => a - b), outDir: state.outDir, format: state.format, keepChapters: state.keepChapters, ...voiceOptions() });
+      await audiobard.start({ file: state.file, chapters: [...state.selected].sort((a, b) => a - b), outDir: state.outDir, format: state.format, keepChapters: state.keepChapters, ...voiceOptions() });
     } catch (e) {
       setRunning(false);
       showError(e.message);
     }
   };
-  $('#cancel').onclick = () => { booklark.cancel(); $('#status').textContent = 'Cancelling after the current part…'; };
+  $('#cancel').onclick = () => { audiobard.cancel(); $('#status').textContent = 'Cancelling after the current part…'; };
 }
 
 init().catch((e) => showError(e.message));

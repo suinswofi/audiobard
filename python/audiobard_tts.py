@@ -1,4 +1,4 @@
-"""Booklark voice-cloning sidecar: Chatterbox Turbo behind a JSON-lines protocol.
+"""Audiobard voice-cloning sidecar: Chatterbox Turbo behind a JSON-lines protocol.
 
 Requests arrive on stdin, one JSON object per line; replies go to a private copy
 of stdout so library chatter can never corrupt the protocol channel.
@@ -139,6 +139,8 @@ def main():
     # Show torch only the chosen device, or none at all, before it initialises: nothing in
     # Chatterbox can then land on an integrated GPU or on a card that failed its test.
     os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["HIP_VISIBLE_DEVICES"] = gpu["id"] if gpu else ""
+    os.environ.setdefault("TQDM_DISABLE", "1")  # the token loop's progress bar would flood the log
+    import time
     import torch
     from chatterbox.tts_turbo import REPO_ID, ChatterboxTurboTTS
     from huggingface_hub import snapshot_download
@@ -157,9 +159,27 @@ def main():
                         "conds.pt", "*.json", "*.txt", "*.yaml"],
     )
 
+    stages = {}
+
+    def timed(obj, name, key):
+        """Wrap a method so each call's wall time lands in stages[key]."""
+        f = getattr(obj, name)
+
+        def g(*a, **k):
+            t = time.perf_counter()
+            r = f(*a, **k)
+            if device != "cpu":
+                torch.cuda.synchronize()
+            stages[key] = stages.get(key, 0.0) + time.perf_counter() - t
+            return r
+
+        setattr(obj, name, g)
+
     def load(dev):
         m = ChatterboxTurboTTS.from_local(ckpt_dir, dev)
         keep_reference_float32(m)
+        timed(m.t3, "inference_turbo", "t3")
+        timed(m.s3gen, "inference", "s3gen")
         return m
 
     def fall_back_to_cpu(reason, stage):
@@ -189,8 +209,18 @@ def main():
     emit({"event": "ready", "sr": model.sr, "device": device, "label": label})
 
     def synth(req):
+        stages.clear()
+        t = time.perf_counter()
         with torch.inference_mode():
-            return model.generate(req["text"], temperature=req.get("temperature", 0.8))
+            wav = model.generate(req["text"], temperature=req.get("temperature", 0.8))
+        total = time.perf_counter() - t
+        seconds = wav.shape[-1] / model.sr
+        # Speech tokens run at 25 per second of audio, so tokens/s of the decoder follows from the length.
+        t3 = stages.get("t3", 0.0)
+        log("synth: %d chars -> %.1f s audio in %.1f s (%.1fx real time); T3 decode %.1f s (about %.0f tokens/s), S3Gen %.1f s, other %.1f s"
+            % (len(req["text"]), seconds, total, seconds / total if total else 0, t3, 25 * seconds / t3 if t3 else 0,
+               stages.get("s3gen", 0.0), total - t3 - stages.get("s3gen", 0.0)))
+        return wav
 
     for line in sys.stdin:
         line = line.strip()

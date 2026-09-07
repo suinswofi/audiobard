@@ -1,5 +1,5 @@
 'use strict';
-// Bundles Booklark into dist/. Prunes the parts of node_modules that only exist for other
+// Bundles Audiobard into dist/. Prunes the parts of node_modules that only exist for other
 // platforms or for GPUs, which is most of their size.
 //
 //   node scripts/package.js                         current platform
@@ -30,7 +30,7 @@ function ensureSharpFor(platform, cpu) {
     const dest = path.join(root, 'node_modules', pkg);
     if (fs.existsSync(dest)) continue;
     console.log(`Fetching ${pkg}@${version} for the ${platform} build...`);
-    const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'booklark-pack-'));
+    const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'audiobard-pack-'));
     const r = spawnSync('npm', ['pack', `${pkg}@${version}`, '--pack-destination', tmp, '--silent'], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`Could not fetch ${pkg}: ${r.stderr}`);
     const tarball = fs.readdirSync(tmp).find((f) => f.endsWith('.tgz'));
@@ -61,15 +61,15 @@ function archive(dir) {
   const [dir] = await packager({
     dir: root,
     out,
-    name: 'Booklark',
-    executableName: 'booklark',
+    name: 'Audiobard',
+    executableName: 'audiobard',
     platform: plat,
     arch,
     overwrite: true,
     asar: false, // native ONNX Runtime libraries are loaded from disk by path
     prune: true,
     ignore: [
-      /^\/(fixtures|out|dist|scripts|\.git|\.gitignore|README\.md)(\/|$)/,
+      /^\/(fixtures|out|dist|docs|scripts|\.git|\.gitignore|README\.md)(\/|$)/,
       /^\/node_modules\/\.bin(\/|$)/,
       /^\/node_modules\/onnxruntime-web\/dist\/.*\.wasm$/, // transformers.js imports onnxruntime-web even in Node, but never runs its WASM here
       // keep only bin/napi-v3/<platform>/<arch> (the walker visits the platform dir first, so allow it too)
@@ -82,7 +82,7 @@ function archive(dir) {
       /^(?!\/LICENSE\.md$).*\.(map|md|ts)$/,
     ],
   });
-  // Booklark's own licence next to the executable, alongside Electron's LICENSE and LICENSES.chromium.html.
+  // Audiobard's own licence next to the executable, alongside Electron's LICENSE and LICENSES.chromium.html.
   fs.copyFileSync(path.join(root, 'LICENSE.md'), path.join(dir, 'LICENSE.md'));
   console.log(`Packaged: ${dir}`);
   if (args.includes('--archive')) {

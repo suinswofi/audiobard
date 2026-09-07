@@ -5,3 +5,4 @@ dist/
 *.wav
 *.m4b
 .cache/
+__pycache__/

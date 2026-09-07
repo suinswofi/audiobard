@@ -10,18 +10,18 @@ const { VOICES } = require('./lib/voices');
 const { migrateUserData } = require('./lib/migrate');
 
 const userData = app.getPath('userData');
-migrateUserData(userData, 'Narrata');
+migrateUserData(userData, ['Booklark', 'Narrata'].map((name) => path.join(path.dirname(userData), name)));
 const dirs = {
   models: path.join(userData, 'models'),
   venv: path.join(userData, 'venv'),
   samples: path.join(userData, 'samples'),
 };
-const cloneScript = path.join(__dirname, 'python', 'booklark_tts.py');
+const cloneScript = path.join(__dirname, 'python', 'audiobard_tts.py');
 
 // Engine status and log lines, fresh for each run of the app. The window shows only the latest
 // status, so this is where to look when the voice engine did something unexpected.
 const engineLog = path.join(userData, 'engine.log');
-try { fs.writeFileSync(engineLog, `Booklark ${app.getVersion()} started ${new Date().toISOString()}\n`); } catch { /* logging is best effort */ }
+try { fs.mkdirSync(userData, { recursive: true }); fs.writeFileSync(engineLog, `Audiobard ${app.getVersion()} started ${new Date().toISOString()}\n`); } catch { /* logging is best effort */ }
 function logLine(line) {
   try { fs.appendFileSync(engineLog, `${new Date().toISOString().slice(11, 19)} ${line}\n`); } catch { /* best effort */ }
 }
@@ -30,10 +30,15 @@ let win = null;
 let worker = null;
 let nextId = 1;
 const pending = new Map();
+// A worker that dies is started again, but one that cannot even get going (a broken native
+// module, say) must not be respawned forever. Any message from the worker resets the count.
+let workerCrashes = 0;
+const MAX_WORKER_CRASHES = 3;
 
 function startWorker() {
-  worker = utilityProcess.fork(path.join(__dirname, 'worker.js'), [], { serviceName: 'booklark-worker', stdio: 'inherit' });
+  worker = utilityProcess.fork(path.join(__dirname, 'worker.js'), [], { serviceName: 'audiobard-worker', stdio: 'inherit' });
   worker.on('message', (msg) => {
+    workerCrashes = 0;
     if (msg.id && pending.has(msg.id)) {
       const p = pending.get(msg.id);
       pending.delete(msg.id);
@@ -47,12 +52,16 @@ function startWorker() {
     for (const p of pending.values()) p.reject(new Error('The conversion engine stopped unexpectedly.'));
     pending.clear();
     if (win && !win.isDestroyed()) win.webContents.send('worker-event', { type: 'error', message: `The conversion engine stopped unexpectedly (code ${code}).` });
-    if (!app.isQuitting) startWorker();
+    worker = null;
+    if (app.isQuitting) return;
+    if (++workerCrashes < MAX_WORKER_CRASHES) startWorker();
+    else logLine(`[error] The conversion engine stopped ${workerCrashes} times in a row; not starting it again.`);
   });
 }
 
 function call(op, payload = {}) {
   return new Promise((resolve, reject) => {
+    if (!worker) return reject(new Error('The conversion engine is not running. Restart the app.'));
     const id = nextId++;
     pending.set(id, { resolve, reject });
     worker.postMessage({ id, op, ...payload });
@@ -72,7 +81,7 @@ function createWindow() {
     height: 860,
     minWidth: 600,
     minHeight: 600,
-    title: 'Booklark',
+    title: 'Audiobard',
     autoHideMenuBar: true,
     backgroundColor: '#f6f4ef',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
@@ -131,7 +140,7 @@ ipcMain.handle('start', (_e, job) => {
   fs.mkdirSync(job.outDir, { recursive: true });
   return call('start', { ...job, ...jobEnv() });
 });
-ipcMain.handle('cancel', () => worker.postMessage({ op: 'cancel' }));
+ipcMain.handle('cancel', () => { if (worker) worker.postMessage({ op: 'cancel' }); });
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));
 

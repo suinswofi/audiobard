@@ -83,7 +83,13 @@ transformers inside `loadKokoro`, so no ONNX model is downloaded or held in memo
 shared step is chunking, which uses a smaller chunk size for cloning.
 
 - **Kokoro** (`lib/kokoro.js`): loads via `kokoro-js` with the HF cache pointed at
-  `<userData>/models`; always CPU. Voice ids and quality grades live in `lib/voices.js`.
+  `<userData>/models`; always CPU. Voice ids and quality grades live in `lib/voices.js`. The
+  model is built from `StyleTextToSpeech2Model` + `AutoTokenizer` rather than
+  `KokoroTTS.from_pretrained` so that ONNX session options can be passed: the CPU memory arena
+  must not be allowed to keep doubling, because Electron's allocator kills the utility process
+  (exit code 133, no message) instead of failing an oversized allocation. Weights stay out of the
+  arena, memory patterns are off, and a maximum-length warm-up at load fixes the arena's size.
+  Do not remove these without re-testing a whole chapter inside the app, not just the CLI.
 - **Clone** (`lib/clone.js` + `python/audiobard_tts.py`): `install()` creates a venv in
   `<userData>/venv`, picks the PyTorch build from `detectGpu()` (`nvidia-smi` → CUDA, `/dev/kfd` +
   AMD vendor id → ROCm, else CPU; macOS uses the default index) and writes a JSON marker file

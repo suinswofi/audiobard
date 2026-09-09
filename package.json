@@ -1,6 +1,6 @@
 {
   "name": "audiobard",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Turn any ebook into an audiobook with local TTS and voice cloning",
   "scripts": {
     "start": "electron .",
